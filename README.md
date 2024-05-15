@@ -1,7 +1,7 @@
 # Web Crawler Project
 
 ## Introduction
-This project develops a simple web crawler capable of downloading all pages from a specific entry point to a local storage system.
+This project develops a simple web crawler capable of downloading all pages from a specific entry point to a local storage system using multithreading.
 This README.md file provides Guidelines for current implementation as well as ideas for a Sytem Design and further enhancements to improve the system.
 
 ## Task Clarifications
@@ -28,14 +28,35 @@ for example:
 ```bash
 https://webscraper.io/test-sites/e-commerce/allinone
 ```
+**Output** - crawled.txt file with all the unique urls that were crawled in sorted manner.
+**None** - based on OS there can be a small delay until the file appears in system.
 
 # Discussion
 ## System Design
 ![High Level System Design](high_level_design-1.jpg)
 
-The system is designed around several core components:
+## Design Prioritization:
 
-### Components Overview
+### Main requiremnts i prioritized:
+#### Efficiency
+1. Multi threading - to assure a faster crawling proccess.
+2. Using in memory efficient data structures like queue and sets.
+# Validation
+1. Robust Valid URL checks
+2. Normalization and Domain to prevent duplicants and infinite loops.
+# Supporting future scalability
+1. Using multi threads - so we can scale the system without much work.
+2. Relevant class structures to support future enhancements (add priorities to specific url withing spider class, filtering with Web parse class etc')
+
+### Main requiremnts i did not prioritize and why:
+#### DataBase
+1. Implementation of robust DB is relatively simple and the magnitude of storage is small so i chose to give this low priority.
+2. Crash consitency - since program is relatively fast and implemeting a clever solution with multi threads will take a lot more time.
+# Politeness
+1. Each website has it's own requiremnts and it will take time to contruct something robust for all websites.
+2. There was not clear instruction to take this into account and it is a field im not well familiar with so i skipped it.
+
+### Components Deep Dive
 
 #### 1. Client
 - **Function**: Initiates the crawling process by providing the seed URL as input from user.
@@ -57,44 +78,52 @@ The system is designed around several core components:
 #### 3. Web Parser
 - **Responsibility**: Fetche/Extract the HTML content of URLs from the internet.
 - **Supporting Components**:
-  - **DNS Lookup**: Resolves domain names (
-  - **Implementation**: handeled by scrapy library
+  - **DNS Lookup**: Resolves domain names - implemented by python
+  - **Normalization**: Makes sure each url is converted to normalized form to assure each url points to exactly one page.
+  - **Validation**: checks url is of valid form
+  - **Fetch/Extract**: implements extract and fetch operation of spider class.
+- **Bottlenecks**:
+  - Parsing and normalization process can be computationally intensive.
+  - Repetitive content fetching without cache utilization leads to inefficiencies.
+  - DNS lookups can be slow and impact crawler performance.
+  - Reliance on external Internet speed and stability.
+- **Enhancements**:
+  - Use a local caching DNS resolver to speed up domain name resolution.
+  - Optimize network configurations and possibly use a dedicated Internet connection
 
-#### 4. Parser
-- **Responsibility**: Parses the HTML content to extract new URLs and relevant data.
-- **Additional functionality**: URLs are Normalized (Canonization) to ensure each URL matches a single Page.
-
-#### 5. Handle Duplicates
-- **Responsibility**: Identifies and handles duplicate pages that different URLs might point to.
+#### 4. Spider (Crawlers)
+- **Responsibility**: A class that performs the actual task of crawling by fetching pages and parsing HTML content.
 - **Supporting Components**:
-  - **Counter**: Saves a count field for each unique URL --> can be used to prioritize URLs to crawl first in URL FRONTIER.
-  - **Implementation**: handeled by scrapy library
- 
-#### 4.URL Extractor
-- **Responsibility**: Extract URL and create an ITEM for it.
- - **Implementation**: using Rules feature from scrapy library
+  - **Duplicants handler**: Avoide proccessing already crawled urls
+- **Bottlenecks**:
+  - As threads increase, the overhead of context switching can impact performance.
+  - Managing a large number of threads efficiently is challenging (Locks mechanism slows perforamnce, user signals not currently supported)
+  - Each duplicants handle implies searching for url in set.
+- **Enhancements**:
+  - Thread Pooling mechanism
+  - Lock-Free Mechanism to minimize critical sections
+  - Duplicants resolution - Use caching and LRU algorithm to avoid searching each url in set repeatedly.
 
-#### 4. URL Visited Detector
-- **Responsibility**: Checks if a URL has already been visited to avoid re-downloading the same page.
-- **Data Structure**: Uses a dictionary to store URLs with a count of visits, ensuring O(1) in expectation for searches.
+ #### 5. Local Storage
+- **Responsibility**: Store crawled data into a file and provide file operations methods.
+- **Bottlenecks**:
+  - I/O operations can slow down the system, especially when dealing with large amounts of data.
+  - Crash Consistency - not supported currently when dealing with abrupt termination.
+  - Limited storage - using memory based database (set , queue)
+- **Enhancements**:
+  - Use a more robust database system like PostgreSQL or MongoDB for storage.
+  - Implement asynchronous I/O operations to enhance performance.
 
-#### 7. Failed URL Handler
-- **Responsibility**: Save all the URLs that we failed to extract
-- **Data Structure**: Uses a list to store URLs that were not reachable
-- **Optionality**: Automate the code so that if the list is not empty add them to URL frontier and keep the proccess running.
-
-### Scalability
+## Scalability 
 The system is designed to scale across multiple servers with regard to the following requirements:
-- **Distributed Crawling**: The architecture supports distributing tasks across multiple crawling instances, using shared resources like URL databases and caches.
+- **Distributed Crawling**: The architecture supports distributing tasks across multiple crawling instances (spiders), using shared resources like URL databases and caches.
+- **Priority**: Prioritize in URL_Frontier which urls to crawl based on relevant factors like - Counter of times we tried to access url , specific domains etc'
 - **Load Balancing**: We will need to implement a mechanism that ensures that all servers are given similar amount of work and that URLs to crawl are spreaded equally. this can be implemeted as a load balancer for example that uses Round Robin algorithm.
 - **Cache**: To prevent different servers crawling the same pages we can use the LRU algorithm and a url cache to ensure that if different servers get the task to crawl the same page that was already crawled they can just take it from a shared cache to extract relevant data from it.
 - **Capacity Estimates**: Given the amount of web pages we need to crawl we can calculate how much time it will take us to complete the task with how many servers available while also taking in acount website policies.
 simple example: Crawling 1 Bilion pages given that each page is 1MB to store. we will need 1 Bilion requests and 1PB memory space. if we want to complete the assingment in 1 week (600K seconds) we need 1B/600k = 1500 requests per second. in general home wifi it takes 0.5 second to load a webpage thus 750 threads per second and we can calculate how many CPUs we need for that.
 
-## Data Handling
-- **URL DB**: Implemeted by a Dictionary of URL items (url , count) , ensuring each page is only downloaded once.
-- **Failed URLs**: List of URLs that failed to download, with errors logged for further analysis.
-- **Bottlenecks--> Mitigation**:
-    - Large data cannot be stored locally --> use external cloud based databases like mongoDB and use pipeline in scrappy to implement this.
-    - Crash Consistency --> perform data storage in between the proccess operations and not just in the end to support consistency, for more sophisticated aproach we can use MetaData Journaling.  
+## Conclusions 
+The project demonstrates a fast and efficient simple way to crawl the entire seed url while validating main requirements hold.
+For the future there is a need to focus on Politeness , Distribution and more robust DataBase usage.
 
