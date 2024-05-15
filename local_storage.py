@@ -1,4 +1,6 @@
 import os
+import sqlite3
+import time
 
 
 def create_project_dir(directory):
@@ -13,18 +15,13 @@ def create_project_dir(directory):
         return False  # Return False to indicate failure
 
 
-def create_data_files(project_name, base_url):
+def create_data_files(base_url):
     """Creates the necessary files for the project and checks for successful creation."""
-    waiting_path = os.path.join(project_name, 'waiting.txt')
-    crawled_path = os.path.join(project_name, 'crawled.txt')
+    crawled_path = 'crawled.txt'
     success = True
 
-    if not os.path.isfile(waiting_path):
-        if not write_file(waiting_path, base_url):
-            print(f"Failed to create file: {waiting_path}")
-            success = False
-
     if not os.path.isfile(crawled_path):
+        time.sleep(3)  # Wait for the file to be created
         if not write_file(crawled_path, ''):
             print(f"Failed to create file: {crawled_path}")
             success = False
@@ -34,16 +31,22 @@ def create_data_files(project_name, base_url):
 
 # Create a new file
 def write_file(path, data):
-    with open(path, 'w') as file:
-        file.write(data)
-        file.close()
+    try:
+        with open(path, 'w') as file:
+            file.write(data)
+            file.flush()
+            os.fsync(file.fileno())
+            print(f"File written and synchronized: {path}")
+    except Exception as e:
+        print(f"Failed to write to {path}: {e}")
 
 
 # add data onto an existing file
 def append_to_file(path, data):
     with open(path, 'a') as file:
         file.write(data + '\n')
-        file.close()
+        file.flush()  # Flush Python's internal buffer
+        os.fsync(file.fileno())  # Ensures all internal buffers associated with the file are written to disk
 
 
 # Delete the contents of a file

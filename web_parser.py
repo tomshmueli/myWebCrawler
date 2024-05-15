@@ -2,6 +2,7 @@ from html.parser import HTMLParser
 from urllib import parse
 import re
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+from urllib.request import urlopen
 
 import requests
 
@@ -12,7 +13,7 @@ class WebParser(HTMLParser):
     all hyperlinks from that page
     """
 
-    def __init__(self, page_url, page_counter):
+    def __init__(self, page_url, page_counter=0):
         super().__init__()
         self.page_url = page_url  # Unique URL of the page we are crawling
         self.page_count = page_counter  # Amount of times we were requested to crawl a page
@@ -126,3 +127,24 @@ def is_valid_url(url):
         return response.status_code == 200
     except requests.RequestException:
         return False
+
+
+def gather_links(normalized_url):
+    """Extract the links from the page and return them as a set
+    NOTE - only crawl_page calls this function that pages are already normalized
+    :param normalized_url: The already normalized URL of the page to extract the links
+    :return: A set of links extracted from the page
+    """
+    html_string = ''
+    try:
+        response = urlopen(normalized_url)  # Open the url in bytes format
+        if 'text/html' in response.getheader('Content-Type'):
+            html_bytes = response.read()  # Read the bytes of the page
+            html_string = html_bytes.decode('utf-8')  # Convert the bytes to string
+        web_parser = WebParser(normalized_url)  # Create an instance of the LinkExtractor class
+        web_parser.feed(html_string)  # Feed the HTML string to the LinkExtractor
+    except Exception as e:
+        print("Error: can't crawl page " + normalized_url + '\n' + str(e))
+        return set()  # Return an empty set of links if an error occurred
+    # ELSE return the set of links extracted from the page
+    return web_parser.page_links()

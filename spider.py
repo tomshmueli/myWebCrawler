@@ -1,85 +1,61 @@
+import threading
+from queue import Queue, Empty
 from urllib.request import urlopen
-from web_parser import WebParser, normalize_url
-from local_storage import *
+from web_parser import WebParser, normalize_url, get_domain_name
+import tldextract
+
+# Shared resources across all Spider threads
+url_queue = Queue()
+crawled_urls = set()
+crawled_lock = threading.Lock()
 
 
-class Spider:
-    # Class variables (shared among all instances)
-    project_name = "this_crawler"
-    base_url = ''
-    domain_name = ''
-    waiting_file = ''
-    crawled_file = ''
-    waiting_queue = set()
-    crawled = set()
+class Spider(threading.Thread):
+    def __init__(self, base_url):
+        super().__init__()
+        self.daemon = True  # Exit when the main thread exits
+        self.base_url = base_url
+        url_queue.put(self.base_url)  # Start with the base URL
 
-    # Initialize the Spider, We use multiple spiders to crawl multiple websites simultaneously
-    def __init__(self, project_name, base_url, domain_name):
-        Spider.project_name = project_name
-        Spider.base_url = base_url
-        Spider.domain_name = domain_name
-        Spider.waiting_file = Spider.project_name + '/waiting.txt'
-        Spider.crawled_file = Spider.project_name + '/crawled.txt'
-        self.boot()  # Initialize the Spider
-        self.crawl_page('First spider', Spider.base_url)  # Start crawling the first page
+    def run(self):
+        while True:
+            try:
+                current_url = url_queue.get(timeout=5)  # Wait for a URL for up to 5 seconds
+                self.process_url(current_url)
+                url_queue.task_done()
+            except Empty:
+                print(f"{self.name} timed out waiting for URLs, exiting...")
+                break
 
-    # Create directory and files for the project on first run and start the Spider
-    @staticmethod
-    def boot():
-        """Initialize the Spider and create the project directory and files if not created"""
-        create_project_dir(Spider.project_name)
-        create_data_files(Spider.project_name, Spider.base_url)
-        Spider.waiting_queue = file_to_set(Spider.waiting_file)
-        Spider.crawled = file_to_set(Spider.crawled_file)
+    def process_url(self, url):
+        normalized_url = normalize_url(url)
+        base_domain = get_domain_name(self.base_url)
+        current_domain = get_domain_name(normalized_url)
 
-    @staticmethod
-    def crawl_page(thread_name, page_url):
-        """Crawl the page and add the links to the waiting queue"""
-        normalized_url = normalize_url(page_url)
-        if normalized_url not in Spider.crawled:
-            print(thread_name + ' now crawling ' + normalized_url)
-            print('Waiting ' + str(len(Spider.waiting_queue)) + ' | Crawled ' + str(len(Spider.crawled)))
-            Spider.add_links_to_waiting(Spider.gather_links(normalized_url))
-            if normalized_url in Spider.waiting_queue:
-                Spider.waiting_queue.remove(normalized_url)
-            Spider.crawled.add(normalized_url)
-            Spider.update_files()
+        if current_domain != base_domain:
+            return  # Skip URLs that are not part of the base domain
 
-    @staticmethod
-    def gather_links(normalized_url):
-        """Extract the links from the page and return them as a set
-        NOTE - only crawl_page calls this function that pages are already normalized
-        :param normalized_url: The already normalized URL of the page to extract the links
-        :return: A set of links extracted from the page
-        """
-        html_string = ''
+        with crawled_lock:
+            if normalized_url in crawled_urls:
+                return
+            crawled_urls.add(normalized_url)
+
+        print(f"Spider {self.name} crawling: {normalized_url}")
         try:
-            response = urlopen(normalized_url)  # Open the url in bytes format
-            if 'text/html' in response.getheader('Content-Type'):
-                html_bytes = response.read()  # Read the bytes of the page
-                html_string = html_bytes.decode('utf-8')  # Convert the bytes to string
-            web_parser = WebParser(Spider.base_url, normalized_url)  # Create an instance of the LinkExtractor class
-            web_parser.feed(html_string)  # Feed the HTML string to the LinkExtractor
+            response = urlopen(normalized_url)
+            content = response.read().decode('utf-8')
+            links = self.extract_links(content, normalized_url)
+            for url in links:
+                if get_domain_name(url) == base_domain:
+                    normalized_link = normalize_url(url)
+                    with crawled_lock:
+                        if normalized_link not in crawled_urls:
+                            url_queue.put(normalized_link)
         except Exception as e:
-            print("Error: can't crawl page " + normalized_url + '\n' + str(e))
-            return set()  # Return an empty set of links if an error occurred
-        # ELSE return the set of links extracted from the page
-        return web_parser.page_links()
+            print(f"Error crawling {normalized_url}: {e}")
 
     @staticmethod
-    def add_links_to_waiting(links):
-        """Add the links to the waiting queue"""
-        for url in links:
-            if url in Spider.waiting_queue or url in Spider.crawled:
-                # Handle duplicates - We have already crawled this page or it is in the queue to be crawled
-                continue
-            if Spider.domain_name not in url:
-                # We are not interested in external links only ones that belong to the domain
-                continue
-            Spider.waiting_queue.add(url)
-
-    @staticmethod
-    def update_files():
-        """Update the files with the new data"""
-        set_to_file(Spider.waiting_queue, Spider.waiting_file)
-        set_to_file(Spider.crawled, Spider.crawled_file)
+    def extract_links(html_content, base_url):
+        parser = WebParser(base_url)
+        parser.feed(html_content)
+        return parser.page_links()
