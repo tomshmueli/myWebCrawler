@@ -31,7 +31,7 @@ https://webscraper.io/test-sites/e-commerce/allinone
 
 # Discussion
 ## System Design
-![High Level System Design](high_level_system_design.jpg)
+![High Level System Design](high_level_design-1.jpg)
 
 The system is designed around several core components:
 
@@ -40,17 +40,24 @@ The system is designed around several core components:
 #### 1. Client
 - **Function**: Initiates the crawling process by providing the seed URL as input from user.
 
-#### 2. URL Frontier (not supported in implementation)
-- **Responsibility**: Manages the queue of URLs to be visited next.
-- **Bottlenecks**: Multiple URLs are given and we needed to iterate over them by priority without overloading a specific website. 
-- **Mitigation**:
-  - **Politeness Policy**: Ensures the crawler does not overwhelm any server by following robot.txt rules.
+#### 2. URL Frontier
+- **Responsibility**: Main program - manages spiders (threads) 
+  - communication with all componants
+  - Managing the databases of crawled/waiting urls.
+- **Bottlenecks**:
+  - currently not supporting websites policies (Politeness/robot.txt)
+  - not supporting prioritization of specific urls
+  - limited to # of threads by the single server running it.
+- **Enhancements**:
+  - **Politeness Policy**: Ensures the crawler does not overwhelm any server by following robot.txt rules - use proxy.
   - **Priority Queueing**: Uses a multi-level feedback queue (MLFQ) to prioritize URLs, in each level use Round Robin algorithm.
+  - **Load Balancer**: a very important componant to add - will be reponsible for making sure no single thread/spider takes too many tasks,
+    while other spiders remain unemployed
 
-#### 3. HTML Fetch
-- **Responsibility**: Fetches the HTML content of URLs from the internet.
+#### 3. Web Parser
+- **Responsibility**: Fetche/Extract the HTML content of URLs from the internet.
 - **Supporting Components**:
-  - **DNS Lookup**: Resolves domain names.
+  - **DNS Lookup**: Resolves domain names (
   - **Implementation**: handeled by scrapy library
 
 #### 4. Parser
