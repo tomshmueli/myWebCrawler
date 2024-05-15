@@ -13,10 +13,9 @@ class WebParser(HTMLParser):
     all hyperlinks from that page
     """
 
-    def __init__(self, page_url, page_counter=0):
+    def __init__(self, page_url):
         super().__init__()
         self.page_url = page_url  # Unique URL of the page we are crawling
-        self.page_count = page_counter  # Amount of times we were requested to crawl a page
         self.links = set()  # Set of links found to crawl
 
     def handle_starttag(self, tag, attrs):

@@ -1,21 +1,13 @@
 import threading
-import time
-from queue import Queue
 from spider import Spider, crawled_urls
-from web_parser import get_domain_name, is_valid_url, normalize_url
+from web_parser import is_valid_url
 from local_storage import *
 
 #
 # # Number of spider threads to run concurrently
-# BASE_URL = "https://webscraper.io/test-sites/e-commerce/allinone"
 PROJECT_NAME = 'MyWebCrawler'
 NUMBER_OF_THREADS = 8  # depends on the number of cores in your CPU
 init_lock = threading.Lock()
-
-
-# threads_queue = Queue()
-# waiting = set()
-# crawled = set()
 
 
 def main():
@@ -31,10 +23,11 @@ def main():
     for spider in spiders:
         spider.join()
 
+    print("**************************")
     print("Crawling has completed.")
     print("Saving data to files...")
 
-    create_data_files(base_url)
+    create_data_files()
     set_to_file(crawled_urls, os.path.join('crawled.txt'))
 
 

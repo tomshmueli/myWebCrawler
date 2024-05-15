@@ -15,18 +15,11 @@ def create_project_dir(directory):
         return False  # Return False to indicate failure
 
 
-def create_data_files(base_url):
+def create_data_files():
     """Creates the necessary files for the project and checks for successful creation."""
     crawled_path = 'crawled.txt'
-    success = True
-
     if not os.path.isfile(crawled_path):
-        time.sleep(3)  # Wait for the file to be created
-        if not write_file(crawled_path, ''):
-            print(f"Failed to create file: {crawled_path}")
-            success = False
-
-    return success  # Return overall success status
+        write_file(crawled_path, '')  # Create a new file
 
 
 # Create a new file
