@@ -29,7 +29,8 @@ for example:
 https://webscraper.io/test-sites/e-commerce/allinone
 ```
 **Output** - crawled.txt file with all the unique urls that were crawled in sorted manner.
-**None** - based on OS there can be a small delay until the file appears in system.
+
+**Note** - based on OS there can be a small delay until the file appears in system.
 
 # Discussion
 ## System Design
