@@ -1,6 +1,4 @@
 import os
-import sqlite3
-import time
 
 
 def create_project_dir(directory):

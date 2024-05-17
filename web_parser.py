@@ -19,6 +19,9 @@ class WebParser(HTMLParser):
         self.links = set()  # Set of links found to crawl
 
     def handle_starttag(self, tag, attrs):
+        """
+        Handle the start tag of an HTML element and extract the links from 'a' tags.
+        """
         if tag == 'a':
             for (attribute, value) in attrs:
                 if attribute == 'href':
